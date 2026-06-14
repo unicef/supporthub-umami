@@ -5,8 +5,12 @@ FROM node:${NODE_IMAGE_VERSION} AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm
+# pnpm-workspace.yaml carries onlyBuiltDependencies/ignoredBuiltDependencies —
+# without it, strict pnpm fails `install` on every package with a build script.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Pin pnpm: latest (10.16+/11) hard-errors on ignored build scripts. 10.0.0 is
+# what the lockfile (v9.0) was built with and only warns.
+RUN npm install -g pnpm@10.0.0
 RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
@@ -39,10 +43,13 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 RUN set -x \
     && apk add --no-cache curl \
-    && npm install -g pnpm
+    && npm install -g pnpm@10.0.0
 
-# Script dependencies
-RUN pnpm --allow-build='@prisma/engines' add npm-run-all dotenv chalk semver \
+# Script dependencies. Pre-seed package.json with the build-approval list so
+# pnpm builds prisma's native engines. (pnpm is pinned to 10.0.0, which has no
+# `--allow-build` flag; `pnpm.onlyBuiltDependencies` is the portable equivalent.)
+RUN printf '{"name":"umami-runner","private":true,"pnpm":{"onlyBuiltDependencies":["@prisma/engines","prisma","@prisma/client"]}}' > package.json \
+    && pnpm add npm-run-all dotenv chalk semver \
     prisma@${PRISMA_VERSION} \
     @prisma/client@${PRISMA_VERSION} \
     @prisma/adapter-pg@${PRISMA_VERSION}
