@@ -32,7 +32,19 @@ RUN npm run build-docker
 FROM node:${NODE_IMAGE_VERSION} AS runner
 WORKDIR /app
 
-ARG PRISMA_VERSION="7.3.0"
+# SupportHub fork: these MUST match the app's resolved versions in
+# pnpm-lock.yaml. Next's output tracing copies PARTIAL slices of the startup
+# scripts' deps into .next/standalone/node_modules; the runner re-adds the
+# COMPLETE packages below. When the versions match, the complete + partial
+# copies merge into one (complete) package — when they drift (e.g. `pnpm add`
+# resolving `latest`), the partial copy shadows the complete one and
+# `node scripts/check-db.js` crashes at boot (missing semver/index.js,
+# @prisma/client, ...). Bump these in lockstep with package.json on upgrades.
+ARG PRISMA_VERSION="7.6.0"
+ARG SEMVER_VERSION="7.7.4"
+ARG NPM_RUN_ALL_VERSION="4.1.5"
+ARG DOTENV_VERSION="17.3.1"
+ARG CHALK_VERSION="5.6.2"
 ARG NODE_OPTIONS
 
 ENV NODE_ENV=production
@@ -45,14 +57,20 @@ RUN set -x \
     && apk add --no-cache curl \
     && npm install -g pnpm@10.0.0
 
-# Script dependencies. Pre-seed package.json with the build-approval list so
-# pnpm builds prisma's native engines. (pnpm is pinned to 10.0.0, which has no
-# `--allow-build` flag; `pnpm.onlyBuiltDependencies` is the portable equivalent.)
+# Script dependencies (for scripts/check-db.js + scripts/update-tracker.js run
+# by `pnpm start-docker`). Pinned to the lockfile versions (see note above).
+# The pre-seeded package.json `onlyBuiltDependencies` is pnpm 10's portable
+# equivalent of `--allow-build` (10.0.0 has no such flag) so prisma's native
+# engines build.
 RUN printf '{"name":"umami-runner","private":true,"pnpm":{"onlyBuiltDependencies":["@prisma/engines","prisma","@prisma/client"]}}' > package.json \
-    && pnpm add npm-run-all dotenv chalk semver \
-    prisma@${PRISMA_VERSION} \
-    @prisma/client@${PRISMA_VERSION} \
-    @prisma/adapter-pg@${PRISMA_VERSION}
+    && pnpm add \
+       npm-run-all@${NPM_RUN_ALL_VERSION} \
+       dotenv@${DOTENV_VERSION} \
+       chalk@${CHALK_VERSION} \
+       semver@${SEMVER_VERSION} \
+       prisma@${PRISMA_VERSION} \
+       @prisma/client@${PRISMA_VERSION} \
+       @prisma/adapter-pg@${PRISMA_VERSION}
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder /app/prisma ./prisma
