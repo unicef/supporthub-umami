@@ -21,7 +21,6 @@ import {
   Globe,
   LifeBuoy,
   LockKeyhole,
-  LogOut,
   Moon,
   Settings,
   Sun,
@@ -70,21 +69,18 @@ export function UserButton({ showText = true, onClose }: UserButtonProps) {
     },
     !cloudMode &&
       user.isAdmin && {
+        id: 'separator',
+        separator: true,
+      },
+    !cloudMode &&
+      user.isAdmin && {
         id: 'admin',
         label: t(labels.admin),
         path: '/admin',
         icon: <LockKeyhole />,
       },
-    {
-      id: 'separator',
-      separator: true,
-    },
-    {
-      id: 'logout',
-      label: t(labels.logout),
-      path: getUrl('/logout'),
-      icon: <LogOut />,
-    },
+    // SupportHub fork: "Logout" removed — umami is SSO-only (DISABLE_LOGIN),
+    // so there is no login page to return to after logging out.
   ].filter(Boolean);
 
   return (

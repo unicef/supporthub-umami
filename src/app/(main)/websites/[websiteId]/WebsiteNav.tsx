@@ -1,7 +1,7 @@
 import { Column, Focusable, Row, Text, Tooltip, TooltipTrigger } from '@umami/react-zen';
 import Link from '@/components/common/Link';
 import { IconLabel } from '@/components/common/IconLabel';
-import { useMessages, useNavigation, useWebsiteNavItems } from '@/components/hooks';
+import { useMessages, useWebsiteNavItems } from '@/components/hooks';
 import { ArrowLeft } from '@/components/icons';
 
 export function WebsiteNav({
@@ -14,12 +14,22 @@ export function WebsiteNav({
   onItemClick?: () => void;
 }) {
   const { t, labels } = useMessages();
-  const { renderUrl } = useNavigation();
   const { items, selectedKey } = useWebsiteNavItems(websiteId);
 
   return (
     <Column gap="2" marginTop={isCollapsed ? '2' : undefined}>
-      <Link href={renderUrl('/websites', false)} role="button" onClick={onItemClick}>
+      {/* SupportHub fork: the website is the SSO landing page, so "Back" returns
+          to SupportHub (the previous history entry) via history.back() instead
+          of navigating to the (hidden) global /websites list. */}
+      <div
+        role="button"
+        tabIndex={0}
+        style={{ cursor: 'pointer' }}
+        onClick={() => {
+          onItemClick?.();
+          window.history.back();
+        }}
+      >
         <TooltipTrigger isDisabled={!isCollapsed} delay={0}>
           <Focusable>
             <Row
@@ -33,7 +43,7 @@ export function WebsiteNav({
           </Focusable>
           <Tooltip placement="right">{t(labels.back)}</Tooltip>
         </TooltipTrigger>
-      </Link>
+      </div>
       {items.map(({ label: sectionLabel, items: sectionItems }, index) => (
         <Column key={`${sectionLabel}${index}`} gap="1" marginBottom="1">
           {!isCollapsed && (

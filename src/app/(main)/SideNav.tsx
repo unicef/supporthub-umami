@@ -2,71 +2,19 @@ import { AdminNav } from '@/app/(main)/admin/AdminNav';
 import { SettingsNav } from '@/app/(main)/settings/SettingsNav';
 import { WebsiteNav } from '@/app/(main)/websites/[websiteId]/WebsiteNav';
 import { IconLabel } from '@/components/common/IconLabel';
-import { useGlobalState, useMessages, useNavigation } from '@/components/hooks';
-import {
-  Globe,
-  Grid2x2,
-  LayoutDashboard,
-  LinkIcon,
-  PanelLeft,
-  PanelsLeftBottom,
-} from '@/components/icons';
+import { useGlobalState, useNavigation } from '@/components/hooks';
+import { PanelLeft } from '@/components/icons';
 import { UserButton } from '@/components/input/UserButton';
 import { Logo } from '@/components/svg';
-import {
-  Button,
-  type ButtonProps,
-  Column,
-  Focusable,
-  Icon,
-  Row,
-  Text,
-  Tooltip,
-  TooltipTrigger,
-} from '@umami/react-zen';
-import Link from '@/components/common/Link';
+import { Button, type ButtonProps, Column, Icon, Row, Text } from '@umami/react-zen';
 
 export function SideNav(props: any) {
-  const { t, labels } = useMessages();
-  const { pathname, renderUrl, websiteId, teamId } = useNavigation();
+  // SupportHub fork: the global navigation (Dashboard / Boards / Websites /
+  // Links / Pixels) is removed. Tenant admins SSO straight into their own
+  // website; they must not browse to other global areas. Only the per-website
+  // nav, the settings/admin sub-navs, and the user menu remain.
+  const { pathname, websiteId } = useNavigation();
   const [isCollapsed] = useGlobalState('sidenav-collapsed', false);
-
-  const links = [
-    ...(!teamId
-      ? [
-          {
-            id: 'dashboard',
-            label: t(labels.dashboard),
-            path: '/dashboard',
-            icon: <PanelsLeftBottom />,
-          },
-        ]
-      : []),
-    {
-      id: 'boards',
-      label: t(labels.boards),
-      path: '/boards',
-      icon: <LayoutDashboard />,
-    },
-    {
-      id: 'websites',
-      label: t(labels.websites),
-      path: '/websites',
-      icon: <Globe />,
-    },
-    {
-      id: 'links',
-      label: t(labels.links),
-      path: '/links',
-      icon: <LinkIcon />,
-    },
-    {
-      id: 'pixels',
-      label: t(labels.pixels),
-      path: '/pixels',
-      icon: <Grid2x2 />,
-    },
-  ];
 
   return (
     <Column
@@ -106,36 +54,7 @@ export function SideNav(props: any) {
           <SettingsNav isCollapsed={isCollapsed} />
         ) : pathname.includes('/admin') ? (
           <AdminNav />
-        ) : (
-          <Column gap="2">
-            {links.map(({ id, path, label, icon }) => {
-              const isSelected = pathname.startsWith(renderUrl(path, false));
-              return (
-                <Link key={id} href={renderUrl(path, false)} role="button">
-                  <TooltipTrigger isDisabled={!isCollapsed} delay={0}>
-                    <Focusable>
-                      <Row
-                        alignItems="center"
-                        hover={{ backgroundColor: 'surface-sunken' }}
-                        backgroundColor={isSelected ? 'surface-sunken' : undefined}
-                        borderRadius
-                        minHeight="40px"
-                      >
-                        <IconLabel
-                          icon={icon}
-                          label={isCollapsed ? '' : label}
-                          weight={isSelected ? 'bold' : undefined}
-                          padding
-                        />
-                      </Row>
-                    </Focusable>
-                    <Tooltip placement="right">{label}</Tooltip>
-                  </TooltipTrigger>
-                </Link>
-              );
-            })}
-          </Column>
-        )}
+        ) : null}
       </Column>
       <Row marginBottom="4" paddingTop="2">
         <UserButton showText={!isCollapsed} />

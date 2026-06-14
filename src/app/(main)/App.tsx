@@ -4,7 +4,6 @@ import Script from 'next/script';
 import { useEffect } from 'react';
 import { MobileNav } from '@/app/(main)/MobileNav';
 import { SideNav } from '@/app/(main)/SideNav';
-import { TopNav } from '@/app/(main)/TopNav';
 import { useConfig, useLoginQuery, useNavigation, useTeamQuery } from '@/components/hooks';
 import { LAST_TEAM_CONFIG } from '@/lib/constants';
 import { removeItem, setItem } from '@/lib/storage';
@@ -63,7 +62,8 @@ export function App({ children }) {
         <SideNav />
       </Column>
       <Column overflowX="hidden" minHeight="0" position="relative">
-        <TopNav />
+        {/* SupportHub fork: top breadcrumb (team + website selector dropdowns)
+            removed — tenant admins are scoped to their own website. */}
         <Column alignItems="center">{children}</Column>
       </Column>
       <UpdateNotice user={user} config={config} />
