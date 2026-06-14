@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { matchesConfiguredPath } from '@/lib/match-configured-path';
+import { blockGlobalRoutes } from '@/lib/supporthub-routes';
 
 export const config = {
   matcher: '/:path*',
@@ -67,7 +68,13 @@ function disableLogin(request: NextRequest) {
 }
 
 export default function middleware(req: NextRequest) {
-  const fns = [customCollectEndpoint, customScriptName, customScriptUrl, disableLogin];
+  const fns = [
+    blockGlobalRoutes,
+    customCollectEndpoint,
+    customScriptName,
+    customScriptUrl,
+    disableLogin,
+  ];
 
   for (const fn of fns) {
     const res = fn(req);
