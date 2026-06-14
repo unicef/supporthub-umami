@@ -63,7 +63,12 @@ export async function GET(request: Request): Promise<Response> {
   // AUTH_TOKEN constant is 'umami.auth' (from src/lib/constants.ts)
   // setClientAuthToken(token) calls setItem(AUTH_TOKEN, token) which does JSON.stringify.
   // We replicate that exactly in the inline script to avoid bug C1 (JSON.parse → Bearer null).
-  const tokenJson = JSON.stringify(sessionToken);
+  // The token is embedded as a JS string literal; JSON.stringify runs IN THE
+  // BROWSER so localStorage holds the JSON-encoded form (`"<token>"`) — exactly
+  // what setClientAuthToken writes and getClientAuthToken's JSON.parse expects.
+  // Interpolating JSON.stringify(token) directly would store the RAW token,
+  // breaking getClientAuthToken (JSON.parse throws → Bearer null → /login). [C1]
+  const tokenLiteral = JSON.stringify(sessionToken);
   const destJson = JSON.stringify(dest);
 
   const html = `<!DOCTYPE html>
@@ -75,7 +80,7 @@ export async function GET(request: Request): Promise<Response> {
 <body>
 <script>
 (function(){
-try{localStorage.setItem('umami.auth',${tokenJson});}catch(e){}
+try{localStorage.setItem('umami.auth',JSON.stringify(${tokenLiteral}));}catch(e){}
 location.replace(${destJson});
 })();
 </script>
