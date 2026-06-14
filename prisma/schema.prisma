@@ -64,16 +64,17 @@ model Session {
 }
 
 model Website {
-  id        String    @id() @map("website_id") @db.Uuid
-  name      String    @db.VarChar(100)
-  domain    String?   @db.VarChar(500)
-  resetAt   DateTime? @map("reset_at") @db.Timestamptz(6)
-  userId    String?   @map("user_id") @db.Uuid
-  teamId    String?   @map("team_id") @db.Uuid
-  createdBy String?   @map("created_by") @db.Uuid
-  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id          String    @id() @map("website_id") @db.Uuid
+  name        String    @db.VarChar(100)
+  domain      String?   @db.VarChar(500)
+  resetAt     DateTime? @map("reset_at") @db.Timestamptz(6)
+  userId      String?   @map("user_id") @db.Uuid
+  teamId      String?   @map("team_id") @db.Uuid
+  createdBy   String?   @map("created_by") @db.Uuid
+  externalRef String?   @unique @map("external_ref") @db.VarChar(255)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   replayEnabled Boolean   @default(false) @map("replay_enabled")
   replayConfig  Json?     @map("replay_config")
@@ -93,6 +94,7 @@ model Website {
   @@index([teamId])
   @@index([createdAt])
   @@index([createdBy])
+  @@index([externalRef])
   @@map("website")
 }
 
@@ -195,21 +197,23 @@ model SessionData {
 }
 
 model Team {
-  id         String    @id() @map("team_id") @db.Uuid
-  name       String    @db.VarChar(50)
-  accessCode String?   @unique @map("access_code") @db.VarChar(50)
-  logoUrl    String?   @map("logo_url") @db.VarChar(2183)
-  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id          String    @id() @map("team_id") @db.Uuid
+  name        String    @db.VarChar(50)
+  accessCode  String?   @unique @map("access_code") @db.VarChar(50)
+  logoUrl     String?   @map("logo_url") @db.VarChar(2183)
+  externalRef String?   @unique @map("external_ref") @db.VarChar(255)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   websites Website[]
   members  TeamUser[]
   links    Link[]
   pixels   Pixel[]
-  boards    Board[]
+  boards   Board[]
 
   @@index([accessCode])
+  @@index([externalRef])
   @@map("team")
 }
 
@@ -381,6 +385,13 @@ model SessionReplay {
   @@index([websiteId, createdAt])
   @@index([sessionId, chunkIndex])
   @@map("session_replay")
+}
+
+model SsoHandoffJti {
+  jti       String   @id @db.Text
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@map("sso_handoff_jti")
 }
 
 model SessionReplaySaved {
