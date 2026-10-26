@@ -176,8 +176,10 @@ export async function POST(request: Request): Promise<Response> {
   const adminUserIds: Record<string, string> = {};
 
   for (const { remoteId, displayName } of validAdmins) {
-    // Username keyed on remoteId — guaranteed unique across tenants
-    const username = `admin:${remoteId}`.slice(0, 255);
+    // Username keyed on remoteId — guaranteed unique across tenants. Lowercased
+    // because umami matches usernames case-insensitively (getUserByUsername
+    // lowercases its input) but stores them as given.
+    const username = `admin:${remoteId}`.toLowerCase().slice(0, 255);
 
     let userId: string;
     const existingUser = await getUserByUsername(username);
