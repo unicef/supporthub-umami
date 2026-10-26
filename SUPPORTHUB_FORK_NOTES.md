@@ -5,7 +5,7 @@ know when integrating with this umami fork.
 
 ## Branch
 
-`supporthub-fork` off `master@c0ea3aefb`
+`supporthub-fork` rebased onto upstream `v3.4.1` (was `master@c0ea3aefb`)
 
 ---
 

@@ -1,22 +1,35 @@
-ARG NODE_IMAGE_VERSION="22-alpine"
+ARG NODE_IMAGE_VERSION="22.23.4-alpine"
+ARG PNPM_VERSION="12.3.4"
+# Keep in sync with the prisma/@prisma/* versions in package.json
+ARG PRISMA_VERSION="7.10.0"
 
 # Install dependencies only when needed
 FROM node:${NODE_IMAGE_VERSION} AS deps
+ARG PNPM_VERSION
+
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-# pnpm-workspace.yaml carries onlyBuiltDependencies/ignoredBuiltDependencies —
-# without it, strict pnpm fails `install` on every package with a build script.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Pin pnpm: latest (10.16+/11) hard-errors on ignored build scripts. 10.0.0 is
-# what the lockfile (v9.0) was built with and only warns.
-RUN npm install -g pnpm@10.0.0
+# Workspace packages (@umami/api-client, @umami/mcp) must be present for a frozen install.
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/mcp/package.json ./packages/mcp/
+COPY packages/mcp/bin ./packages/mcp/bin/
+RUN npm install -g pnpm@${PNPM_VERSION}
+
+RUN printf 'strictDepBuilds: false\n' >> pnpm-workspace.yaml
+
 RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM node:${NODE_IMAGE_VERSION} AS builder
+ARG PNPM_VERSION
 WORKDIR /app
+# build:openapi shells out to pnpm, so the builder stage needs it too
+RUN npm install -g pnpm@${PNPM_VERSION}
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/api-client/node_modules ./packages/api-client/node_modules
+COPY --from=deps /app/packages/mcp/node_modules ./packages/mcp/node_modules
 COPY . .
 COPY docker/proxy.ts ./src
 
@@ -26,7 +39,10 @@ ENV BASE_PATH=$BASE_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
-RUN npm run build-docker
+ARG SKIP_BUILD_GEO
+ENV SKIP_BUILD_GEO=$SKIP_BUILD_GEO
+
+RUN pnpm build:docker
 
 # Production image, copy all the files and run next
 FROM node:${NODE_IMAGE_VERSION} AS runner
@@ -40,12 +56,13 @@ WORKDIR /app
 # resolving `latest`), the partial copy shadows the complete one and
 # `node scripts/check-db.js` crashes at boot (missing semver/index.js,
 # @prisma/client, ...). Bump these in lockstep with package.json on upgrades.
-ARG PRISMA_VERSION="7.6.0"
-ARG SEMVER_VERSION="7.7.4"
+ARG SEMVER_VERSION="7.8.5"
 ARG NPM_RUN_ALL_VERSION="4.1.5"
-ARG DOTENV_VERSION="17.3.1"
+ARG DOTENV_VERSION="17.4.2"
 ARG CHALK_VERSION="5.6.2"
 ARG NODE_OPTIONS
+ARG PNPM_VERSION
+ARG PRISMA_VERSION
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -53,24 +70,30 @@ ENV NODE_OPTIONS=$NODE_OPTIONS
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+# Bootstrap pnpm with the bundled npm, then remove npm in the same layer so the
+# vulnerable packages vendored inside the npm CLI are not shipped in the final
+# image. pnpm is the only package manager needed at build and runtime.
 RUN set -x \
-    && apk add --no-cache curl \
-    && npm install -g pnpm@10.0.0
+    && apk add --no-cache curl libc6-compat \
+    && npm install -g pnpm@${PNPM_VERSION} \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-# Script dependencies (for scripts/check-db.js + scripts/update-tracker.js run
-# by `pnpm start-docker`). Pinned to the lockfile versions (see note above).
-# The pre-seeded package.json `onlyBuiltDependencies` is pnpm 10's portable
-# equivalent of `--allow-build` (10.0.0 has no such flag) so prisma's native
-# engines build.
-RUN printf '{"name":"umami-runner","private":true,"pnpm":{"onlyBuiltDependencies":["@prisma/engines","prisma","@prisma/client"]}}' > package.json \
-    && pnpm add \
-       npm-run-all@${NPM_RUN_ALL_VERSION} \
-       dotenv@${DOTENV_VERSION} \
-       chalk@${CHALK_VERSION} \
-       semver@${SEMVER_VERSION} \
-       prisma@${PRISMA_VERSION} \
-       @prisma/client@${PRISMA_VERSION} \
-       @prisma/adapter-pg@${PRISMA_VERSION}
+RUN echo {} > package.json
+
+RUN printf "allowBuilds:\n  '@prisma/engines': true\n  prisma: false\nverifyDepsBeforeRun: false\n" > pnpm-workspace.yaml
+
+# Script dependencies, pinned to the lockfile versions (see note above).
+RUN pnpm add npm-run-all@${NPM_RUN_ALL_VERSION} dotenv@${DOTENV_VERSION} chalk@${CHALK_VERSION} semver@${SEMVER_VERSION} \
+    prisma@${PRISMA_VERSION} \
+    @prisma/client@${PRISMA_VERSION} \
+    @prisma/adapter-pg@${PRISMA_VERSION}
+
+# Assert the @prisma/engines postinstall actually downloaded the engine
+# binaries. If pnpm blocked the build script (e.g. allowBuilds not honored by
+# the installed pnpm version), prisma would try to download engines at runtime
+# as the non-root user and fail with a permissions error.
+RUN ls node_modules/.pnpm/@prisma+engines@${PRISMA_VERSION}/node_modules/@prisma/engines/*engine* \
+    || (echo "ERROR: Prisma engine binaries missing - @prisma/engines postinstall was blocked" && exit 1)
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder /app/prisma ./prisma
@@ -90,4 +113,4 @@ EXPOSE 3000
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
-CMD ["pnpm", "start-docker"]
+CMD ["sh", "scripts/start-docker.sh"]

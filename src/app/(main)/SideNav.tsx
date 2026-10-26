@@ -1,12 +1,14 @@
+import { Button, type ButtonProps, Column, Icon, Row, Text } from '@umami/react-zen';
 import { AdminNav } from '@/app/(main)/admin/AdminNav';
 import { SettingsNav } from '@/app/(main)/settings/SettingsNav';
 import { WebsiteNav } from '@/app/(main)/websites/[websiteId]/WebsiteNav';
 import { IconLabel } from '@/components/common/IconLabel';
+import { OverlayScrollArea } from '@/components/common/OverlayScrollArea';
+import styles from '@/components/common/OverlayScrollArea.module.css';
 import { useGlobalState, useNavigation } from '@/components/hooks';
 import { PanelLeft } from '@/components/icons';
 import { UserButton } from '@/components/input/UserButton';
 import { Logo } from '@/components/svg';
-import { Button, type ButtonProps, Column, Icon, Row, Text } from '@umami/react-zen';
 
 export function SideNav(props: any) {
   // SupportHub fork: the global navigation (Dashboard / Boards / Websites /
@@ -19,10 +21,10 @@ export function SideNav(props: any) {
   return (
     <Column
       {...props}
-      backgroundColor="surface-base"
+      backgroundColor="surface"
       border
       borderRadius
-      paddingX="2"
+      padding="2"
       flexGrow="1"
       minHeight="0"
       margin="2"
@@ -35,10 +37,15 @@ export function SideNav(props: any) {
       <Row
         alignItems="center"
         justifyContent="space-between"
-        height="60px"
+        minHeight="9"
         style={{ flexShrink: 0 }}
       >
-        <Row paddingX="3" alignItems="center" justifyContent="space-between" flexGrow="1">
+        <Row
+          padding="3"
+          alignItems="center"
+          justifyContent={isCollapsed ? 'center' : 'space-between'}
+          flexGrow="1"
+        >
           {!isCollapsed && (
             <IconLabel icon={<Logo />}>
               <Text weight="bold">umami</Text>
@@ -47,7 +54,10 @@ export function SideNav(props: any) {
           <PanelButton />
         </Row>
       </Row>
-      <Column flexGrow="1" minHeight="0" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
+      <OverlayScrollArea
+        className={isCollapsed ? styles.collapsed : undefined}
+        style={{ flexGrow: 1, minHeight: 0 }}
+      >
         {websiteId ? (
           <WebsiteNav websiteId={websiteId} isCollapsed={isCollapsed} />
         ) : pathname.includes('/settings') ? (
@@ -55,8 +65,13 @@ export function SideNav(props: any) {
         ) : pathname.includes('/admin') ? (
           <AdminNav />
         ) : null}
-      </Column>
-      <Row marginBottom="4" paddingTop="2">
+      </OverlayScrollArea>
+      <Row
+        paddingTop="2"
+        width="100%"
+        justifyContent={isCollapsed ? 'center' : undefined}
+        style={{ flexShrink: 0 }}
+      >
         <UserButton showText={!isCollapsed} />
       </Row>
     </Column>
